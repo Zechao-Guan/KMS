@@ -20,7 +20,7 @@ type Word = {
 type NewWord = {
   word: string;
   definition: string;
-  example: string;
+  notes: string;
 };
 
 const formSchema = z.object({
@@ -92,7 +92,7 @@ const WordCard = memo(({
     <div>
       <div className="font-semibold text-lg">{word.word}</div>
       <div className="text-sm text-gray-600">{word.definition}</div>
-      <div className="text-xs text-gray-400">{word.example}</div>
+      <div className="text-xs text-gray-400">{word.notes}</div>
       <div className="text-xs text-gray-400">{new Date(word.created_at).toLocaleString()}</div>
     </div>
     <button
@@ -115,12 +115,12 @@ const AddWordForm = memo(({
   onCancel: () => void;
   isAdding: boolean;
 }) => {
-  const [formData, setFormData] = useState<NewWord>({ word: "", definition: "", example: "" });
+  const [formData, setFormData] = useState<NewWord>({ word: "", definition: "", notes: "" });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(e);
-    setFormData({ word: "", definition: "", example: "" });
+    setFormData({ word: "", definition: "", notes: "" });
   };
 
   return (
@@ -141,9 +141,9 @@ const AddWordForm = memo(({
       />
       <input
         className="border rounded px-3 py-2"
-        placeholder="例句"
-        value={formData.example}
-        onChange={e => setFormData(f => ({ ...f, example: e.target.value }))}
+        placeholder="备注"
+        value={formData.notes}
+        onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))}
       />
       <div className="flex gap-2">
         <button
