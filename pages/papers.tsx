@@ -22,8 +22,8 @@ type Paper = {
 
 type NewPaper = {
   title: string;
-  link: string;
-  note: string;
+  link?: string;
+  note?: string;
   tags: string[];
 };
 
@@ -164,9 +164,9 @@ export default function Papers() {
     setLoading(true);
     setError(null);
     const newStatus = currentStatus === "read" ? "unread" : "read";
-    const { error } = await supabase
+      const { error } = await supabase
       .from("papers")
-      .update({ status: newStatus })
+        .update({ status: newStatus })
       .eq("id", id);
     if (error) setError(error.message);
     fetchPapers();
@@ -176,27 +176,27 @@ export default function Papers() {
   const filteredPapers = useMemo(() => {
     return papers.filter(paper => {
       // 按状态筛选
-      if (filter !== "all" && paper.status !== filter) {
-        return false;
-      }
+    if (filter !== "all" && paper.status !== filter) {
+      return false;
+    }
       // 按标签筛选
       if (selectedTag && (!paper.tags || !paper.tags.includes(selectedTag))) {
         return false;
       }
       // 按搜索关键词筛选
-      if (searchQuery) {
-        return paper.title.toLowerCase().includes(searchQuery.toLowerCase());
-      }
-      return true;
-    });
+    if (searchQuery) {
+      return paper.title.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
   }, [papers, filter, selectedTag, searchQuery]);
 
   const startEditing = (paper: Paper) => {
     setEditingPaper(paper);
     setEditForm({
       title: paper.title,
-      link: paper.link,
-      note: paper.note,
+      link: paper.link || "",
+      note: paper.note || "",
       tags: paper.tags || [],
     });
   };
@@ -262,8 +262,8 @@ export default function Papers() {
         >
           <div>
             <h1 className="text-4xl md:text-5xl font-bold text-center mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
-              Papers
-            </h1>
+            Papers
+          </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 text-center mb-12 max-w-2xl mx-auto">
               Track and manage your research papers with ease
             </p>
@@ -530,6 +530,37 @@ export default function Papers() {
             </Card>
           </motion.div>
 
+          {/* 标签分类筛选 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.8 }}
+          >
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Filter by Tags</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {allTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {allTags.map((tag) => (
+                      <Button
+                        key={tag}
+                        onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                        className={`rounded-full bg-gradient-to-br from-gray-100 to-gray-300 dark:from-[#444] dark:to-[#222] text-black dark:text-white px-4 py-1 text-sm shadow hover:scale-105 transition-transform ${selectedTag === tag ? 'ring-2 ring-blue-500 dark:ring-blue-400 scale-105' : ''}`}
+                        variant="ghost"
+                      >
+                        {tag}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center text-gray-500 dark:text-gray-400">No tags available</p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+
           {/* 原有的论文列表和添加表单 */}
           <div className="flex flex-col md:flex-row gap-8">
             {/* 左侧表单 */}
@@ -542,46 +573,46 @@ export default function Papers() {
               <Card className="rounded-2xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30 shadow-xl p-6">
                 <CardHeader>
                   <CardTitle className="text-2xl font-bold text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-blue-400 dark:from-blue-400 dark:to-blue-300">
-                    Add New Paper
+                  Add New Paper
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Title
-                      </label>
-                      <Input
-                        type="text"
-                        value={newPaper.title}
-                        onChange={(e) => setNewPaper({ ...newPaper, title: e.target.value })}
-                        className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
-                        placeholder="Paper title"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Link
-                      </label>
-                      <Input
-                        type="text"
-                        value={newPaper.link}
-                        onChange={(e) => setNewPaper({ ...newPaper, link: e.target.value })}
-                        className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
-                        placeholder="Paper link"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Note
-                      </label>
+          <div className="space-y-4">
+            <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Title
+              </label>
+                    <Input
+                type="text"
+                value={newPaper.title}
+                onChange={(e) => setNewPaper({ ...newPaper, title: e.target.value })}
+                      className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
+                      placeholder="Paper title"
+              />
+            </div>
+            <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Link
+              </label>
+                    <Input
+                      type="text"
+                value={newPaper.link}
+                onChange={(e) => setNewPaper({ ...newPaper, link: e.target.value })}
+                      className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
+                      placeholder="Paper link"
+              />
+            </div>
+            <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Note
+              </label>
                       <Textarea
-                        value={newPaper.note}
-                        onChange={(e) => setNewPaper({ ...newPaper, note: e.target.value })}
-                        className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
-                        placeholder="Your notes"
-                      />
-                    </div>
+                value={newPaper.note}
+                onChange={(e) => setNewPaper({ ...newPaper, note: e.target.value })}
+                      className="rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
+                      placeholder="Your notes"
+                    />
+                  </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Tags (comma separated)
@@ -595,13 +626,13 @@ export default function Papers() {
                       />
                     </div>
                     <Button
-                      onClick={addPaper}
+                    onClick={addPaper}
                       className="w-full rounded-full bg-gradient-to-br from-gray-100 to-gray-200 dark:from-[#444] dark:to-[#222] text-black dark:text-white px-6 py-2 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 font-medium"
                       disabled={adding}
-                    >
+                  >
                       {adding ? "Adding..." : "Add Paper"}
                     </Button>
-                  </div>
+                </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -615,43 +646,43 @@ export default function Papers() {
             >
               <Card className="rounded-2xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30 shadow-xl p-6">
                 <CardContent>
-                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <Input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full md:w-64 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
-                      placeholder="Search papers..."
-                    />
-                    <div className="flex gap-2">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                  <Input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full md:w-64 rounded-xl bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-blue-300"
+                    placeholder="Search papers..."
+                  />
+                  <div className="flex gap-2">
                       <Button
-                        onClick={() => setFilter('all')}
+                      onClick={() => setFilter('all')}
                         variant={filter === 'all' ? 'default' : 'ghost'}
                         className="rounded-full"
                       >
                         All
                       </Button>
                       <Button
-                        onClick={() => setFilter('read')}
+                      onClick={() => setFilter('read')}
                         variant={filter === 'read' ? 'default' : 'ghost'}
                         className="rounded-full"
-                      >
-                        Read
+              >
+                      Read
                       </Button>
                       <Button
-                        onClick={() => setFilter('unread')}
+                      onClick={() => setFilter('unread')}
                         variant={filter === 'unread' ? 'default' : 'ghost'}
                         className="rounded-full"
-                      >
-                        Unread
+              >
+                      Unread
                       </Button>
-                    </div>
-                  </div>
+            </div>
+          </div>
 
-                  {loading ? (
-                    <div className="text-center py-8 text-gray-600 dark:text-gray-300">Loading...</div>
-                  ) : error ? (
-                    <div className="text-center py-8 text-red-500">{error}</div>
+      {loading ? (
+                  <div className="text-center py-8 text-gray-600 dark:text-gray-300">Loading...</div>
+                ) : error ? (
+                  <div className="text-center py-8 text-red-500">{error}</div>
                   ) : filteredPapers.length === 0 ? (
                     <div className="text-center py-8 text-gray-600 dark:text-gray-400">
                       {selectedTag 
@@ -660,11 +691,11 @@ export default function Papers() {
                           ? "No papers found matching your search"
                           : "No papers found"}
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredPapers.map((paper) => (
+      ) : (
+                  <div className="space-y-4">
+          {filteredPapers.map((paper) => (
                         <motion.div
-                          key={paper.id}
+              key={paper.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           whileHover={{ scale: 1.02 }}
@@ -735,30 +766,30 @@ export default function Papers() {
                             </div>
                           ) : (
                             <div className="flex flex-col gap-4">
-                              <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
-                                    {paper.title}
-                                  </h3>
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                    {paper.title}
+                  </h3>
                                   {paper.note && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                                      {paper.note}
-                                    </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                              {paper.note}
+                            </p>
                                   )}
                                   {paper.tags && paper.tags.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-2">
                                       {paper.tags.map((tag) => (
-                                        <span
+                          <span
                                           key={tag}
                                           className="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
                                         >
                                           {tag}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                          </span>
+          ))}
+        </div>
+      )}
+    </div>
+            </div>
                               <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
                                 <div className="flex items-center gap-2">
                                   <Button
