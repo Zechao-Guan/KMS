@@ -1,232 +1,416 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
-import { Plus, Check, X } from 'lucide-react'
+import { useEffect, useState, useCallback, memo } from "react";
+import { supabase } from "../lib/supabase";
+import { Input } from "@/components/ui/input";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 
 type Word = {
-  id: number
-  word: string
-  definition: string
-  example: string
-  status: 'mastered' | 'unmastered'
-  created_at: string
-}
+  id: number;
+  word: string;
+  definition: string;
+  notes: string;
+  status: "mastered" | "unmastered";
+  created_at: string;
+};
 
-export default function Words() {
-  const [words, setWords] = useState<Word[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [newWord, setNewWord] = useState({
-    word: '',
-    definition: '',
-    example: '',
-  })
-  const [filter, setFilter] = useState<'all' | 'mastered' | 'unmastered'>('all')
+type NewWord = {
+  word: string;
+  definition: string;
+  example: string;
+};
 
-  useEffect(() => {
-    fetchWords()
-  }, [])
+const formSchema = z.object({
+  word: z.string().min(1, "单词不能为空"),
+  definition: z.string().optional(),
+  notes: z.string().optional(),
+});
 
-  async function fetchWords() {
-    try {
-      const { data, error } = await supabase
-        .from('words')
-        .select('*')
-        .order('created_at', { ascending: false })
+// 搜索框组件
+const SearchBar = memo(({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
+  <div className="mb-6">
+    <Input
+      type="text"
+      placeholder="搜索单词或释义..."
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full"
+    />
+  </div>
+));
+SearchBar.displayName = "SearchBar";
 
-      if (error) throw error
-      setWords(data || [])
-    } catch (error) {
-      console.error('Error fetching words:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+// 状态筛选按钮组件
+const FilterButtons = memo(({ 
+  currentFilter, 
+  onFilterChange 
+}: { 
+  currentFilter: "all" | "mastered" | "unmastered";
+  onFilterChange: (filter: "all" | "mastered" | "unmastered") => void;
+}) => (
+  <div className="flex gap-2 mb-6">
+    <button
+      onClick={() => onFilterChange("all")}
+      className={`px-4 py-2 rounded ${
+        currentFilter === "all" ? "bg-blue-600 text-white" : "bg-gray-200"
+      }`}
+    >
+      全部
+    </button>
+    <button
+      onClick={() => onFilterChange("unmastered")}
+      className={`px-4 py-2 rounded ${
+        currentFilter === "unmastered" ? "bg-yellow-400 text-white" : "bg-gray-200"
+      }`}
+    >
+      未掌握
+    </button>
+    <button
+      onClick={() => onFilterChange("mastered")}
+      className={`px-4 py-2 rounded ${
+        currentFilter === "mastered" ? "bg-green-400 text-white" : "bg-gray-200"
+      }`}
+    >
+      已掌握
+    </button>
+  </div>
+));
+FilterButtons.displayName = "FilterButtons";
 
-  async function addWord(e: React.FormEvent) {
-    e.preventDefault()
-    try {
-      const { data, error } = await supabase
-        .from('words')
-        .insert([{ ...newWord, status: 'unmastered' }])
-        .select()
+// 单词卡片组件
+const WordCard = memo(({ 
+  word, 
+  onToggleStatus 
+}: { 
+  word: Word;
+  onToggleStatus: (id: number, status: "mastered" | "unmastered") => void;
+}) => (
+  <li className="bg-gray-100 p-4 rounded flex flex-col md:flex-row md:items-center justify-between">
+    <div>
+      <div className="font-semibold text-lg">{word.word}</div>
+      <div className="text-sm text-gray-600">{word.definition}</div>
+      <div className="text-xs text-gray-400">{word.example}</div>
+      <div className="text-xs text-gray-400">{new Date(word.created_at).toLocaleString()}</div>
+    </div>
+    <button
+      className={`mt-2 md:mt-0 px-3 py-1 rounded ${word.status === "unmastered" ? "bg-yellow-400" : "bg-green-400"} text-white`}
+      onClick={() => onToggleStatus(word.id, word.status)}
+    >
+      {word.status === "unmastered" ? "标为掌握" : "标为未掌握"}
+    </button>
+  </li>
+));
+WordCard.displayName = "WordCard";
 
-      if (error) throw error
-      setWords([...(data || []), ...words])
-      setNewWord({ word: '', definition: '', example: '' })
-      setShowForm(false)
-    } catch (error) {
-      console.error('Error adding word:', error)
-    }
-  }
+// 添加单词表单组件
+const AddWordForm = memo(({ 
+  onSubmit, 
+  onCancel, 
+  isAdding 
+}: { 
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  isAdding: boolean;
+}) => {
+  const [formData, setFormData] = useState<NewWord>({ word: "", definition: "", example: "" });
 
-  async function toggleStatus(id: number, currentStatus: 'mastered' | 'unmastered') {
-    try {
-      const newStatus = currentStatus === 'mastered' ? 'unmastered' : 'mastered'
-      const { error } = await supabase
-        .from('words')
-        .update({ status: newStatus })
-        .eq('id', id)
-
-      if (error) throw error
-      setWords(words.map(word => 
-        word.id === id ? { ...word, status: newStatus } : word
-      ))
-    } catch (error) {
-      console.error('Error updating word status:', error)
-    }
-  }
-
-  const filteredWords = words.filter(word => 
-    filter === 'all' ? true : word.status === filter
-  )
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(e);
+    setFormData({ word: "", definition: "", example: "" });
+  };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">单词管理</h1>
+    <form onSubmit={handleSubmit} className="mb-6 bg-white p-4 rounded shadow flex flex-col gap-2">
+      <input
+        className="border rounded px-3 py-2"
+        placeholder="单词"
+        value={formData.word}
+        onChange={e => setFormData(f => ({ ...f, word: e.target.value }))}
+        required
+      />
+      <input
+        className="border rounded px-3 py-2"
+        placeholder="释义"
+        value={formData.definition}
+        onChange={e => setFormData(f => ({ ...f, definition: e.target.value }))}
+        required
+      />
+      <input
+        className="border rounded px-3 py-2"
+        placeholder="例句"
+        value={formData.example}
+        onChange={e => setFormData(f => ({ ...f, example: e.target.value }))}
+      />
+      <div className="flex gap-2">
         <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          type="submit"
+          className="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition"
+          disabled={isAdding}
         >
-          <Plus className="w-5 h-5 mr-2" />
-          添加单词
+          {isAdding ? "添加中..." : "添加"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 border rounded hover:bg-gray-100 transition"
+        >
+          取消
         </button>
       </div>
+    </form>
+  );
+});
+AddWordForm.displayName = "AddWordForm";
 
-      <div className="mb-6">
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'all'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            全部
-          </button>
-          <button
-            onClick={() => setFilter('unmastered')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'unmastered'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            未掌握
-          </button>
-          <button
-            onClick={() => setFilter('mastered')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'mastered'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            已掌握
-          </button>
-        </div>
-      </div>
+export default function Words() {
+  const [words, setWords] = useState<Word[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "mastered" | "unmastered">("all");
+  const [showForm, setShowForm] = useState(false);
 
-      {showForm && (
-        <form onSubmit={addWord} className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                单词
-              </label>
-              <input
-                type="text"
-                value={newWord.word}
-                onChange={(e) => setNewWord({ ...newWord, word: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                required
-              />
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      word: "",
+      definition: "",
+      notes: "",
+    },
+  });
+
+  const fetchWords = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error } = await supabase
+      .from("words")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) setError(error.message);
+    else setWords(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchWords();
+  }, [fetchWords]);
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.from("words").insert([
+      { ...values, status: "unmastered" },
+    ]);
+    if (error) setError(error.message);
+    form.reset();
+    await fetchWords();
+  };
+
+  const toggleStatus = useCallback(async (id: number, currentStatus: "mastered" | "unmastered") => {
+    setLoading(true);
+    setError(null);
+    const newStatus = currentStatus === "mastered" ? "unmastered" : "mastered";
+    const { error } = await supabase
+      .from("words")
+      .update({ status: newStatus })
+      .eq("id", id);
+    if (error) setError(error.message);
+    await fetchWords();
+  }, [fetchWords]);
+
+  const filteredWords = words.filter(word => {
+    if (filter !== "all" && word.status !== filter) {
+      return false;
+    }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        word.word.toLowerCase().includes(query) ||
+        word.definition.toLowerCase().includes(query)
+      );
+    }
+    return true;
+  });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+      <div className="container mx-auto px-4 py-12 md:py-20">
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+            Words
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-12 leading-relaxed">
+            Track and manage your vocabulary with ease.
+          </p>
+
+          <div className="flex flex-col md:flex-row gap-8">
+            {/* 左侧表单 */}
+            <div className="w-full md:w-1/3">
+              <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-2xl font-semibold text-gray-900 dark:text-white">
+                    添加单词
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="word"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-700 dark:text-gray-300">单词</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20"
+                                placeholder="输入单词"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="definition"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-700 dark:text-gray-300">释义</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20"
+                                placeholder="输入释义（可选）"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-gray-700 dark:text-gray-300">备注</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20"
+                                placeholder="添加备注（可选）"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full bg-gradient-to-br from-[#e0e0e0] to-[#f9f9f9] dark:from-[#444] dark:to-[#222]
+                                 text-black dark:text-white hover:scale-105 transition-transform"
+                        disabled={loading}
+                      >
+                        {loading ? "添加中..." : "添加"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                释义
-              </label>
-              <input
-                type="text"
-                value={newWord.definition}
-                onChange={(e) => setNewWord({ ...newWord, definition: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                例句
-              </label>
-              <textarea
-                value={newWord.example}
-                onChange={(e) => setNewWord({ ...newWord, example: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                rows={3}
-              />
-            </div>
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-              >
-                取消
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700"
-              >
-                添加
-              </button>
+
+            {/* 右侧列表 */}
+            <div className="w-full md:w-2/3">
+              <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30 dark:border-white/10">
+                <CardContent className="pt-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                    <Input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full md:w-64 bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/20"
+                      placeholder="搜索单词或释义..."
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant={filter === "all" ? "default" : "outline"}
+                        onClick={() => setFilter("all")}
+                        className="rounded-full"
+                      >
+                        全部
+                      </Button>
+                      <Button
+                        variant={filter === "mastered" ? "default" : "outline"}
+                        onClick={() => setFilter("mastered")}
+                        className="rounded-full"
+                      >
+                        已掌握
+                      </Button>
+                      <Button
+                        variant={filter === "unmastered" ? "default" : "outline"}
+                        onClick={() => setFilter("unmastered")}
+                        className="rounded-full"
+                      >
+                        未掌握
+                      </Button>
+                    </div>
+                  </div>
+
+                  {loading ? (
+                    <div className="text-center py-8 text-gray-600 dark:text-gray-300">加载中...</div>
+                  ) : error ? (
+                    <div className="text-center py-8 text-red-500">{error}</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredWords.map((word) => (
+                        <div
+                          key={word.id}
+                          className="bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/30 dark:border-white/10
+                                   hover:scale-[1.02] transition-transform cursor-pointer"
+                          onClick={() => toggleStatus(word.id, word.status)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                                {word.word}
+                              </h3>
+                              {word.definition && (
+                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                  {word.definition}
+                                </p>
+                              )}
+                              {word.notes && (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  {word.notes}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={`px-3 py-1 rounded-full text-sm font-medium
+                                ${word.status === "mastered"
+                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                  : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                                }`}
+                            >
+                              {word.status === "mastered" ? '已掌握' : '未掌握'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
-        </form>
-      )}
-
-      {loading ? (
-        <div className="text-center py-8">加载中...</div>
-      ) : (
-        <div className="grid gap-6">
-          {filteredWords.map((word) => (
-            <div
-              key={word.id}
-              className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-2">
-                    {word.word}
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-2">
-                    {word.definition}
-                  </p>
-                  {word.example && (
-                    <p className="text-gray-500 dark:text-gray-400 italic">
-                      {word.example}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => toggleStatus(word.id, word.status)}
-                  className={`p-2 rounded-full ${
-                    word.status === 'mastered'
-                      ? 'bg-green-100 text-green-600'
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {word.status === 'mastered' ? (
-                    <Check className="w-5 h-5" />
-                  ) : (
-                    <X className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
         </div>
-      )}
+      </div>
     </div>
-  )
+  );
 } 
