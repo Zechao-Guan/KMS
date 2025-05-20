@@ -108,4 +108,58 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Supabase](https://supabase.com/)
 - [shadcn/ui](https://ui.shadcn.com/)
-- [Framer Motion](https://www.framer.com/motion/) 
+- [Framer Motion](https://www.framer.com/motion/)
+
+## Deployment | 部署
+
+### Deploy to Vercel | 部署到 Vercel
+
+1. Push your code to GitHub | 将代码推送到 GitHub:
+```bash
+git add .
+git commit -m "Initial commit"
+git push origin main
+```
+
+2. Go to [Vercel](https://vercel.com) and sign in with your GitHub account | 访问 [Vercel](https://vercel.com) 并使用 GitHub 账号登录
+
+3. Click "New Project" | 点击 "New Project"
+
+4. Import your repository | 导入你的仓库:
+   - Select the repository | 选择仓库
+   - Click "Import" | 点击 "Import"
+
+5. Configure your project | 配置项目:
+   - Framework Preset: Next.js
+   - Root Directory: ./
+   - Build Command: `npm run build`
+   - Output Directory: .next
+   - Install Command: `npm install`
+
+6. Add Environment Variables | 添加环境变量:
+   - `NEXT_PUBLIC_SUPABASE_URL`: Your Supabase URL | 你的 Supabase URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase Anon Key | 你的 Supabase Anon Key
+
+7. Click "Deploy" | 点击 "Deploy"
+
+### Automatic Deployments | 自动部署
+
+- Every push to the main branch will trigger a new deployment | 每次推送到主分支都会触发新的部署
+- Preview deployments are created for pull requests | 为拉取请求创建预览部署
+- You can configure deployment settings in the Vercel dashboard | 你可以在 Vercel 仪表板中配置部署设置
+
+### Custom Domain | 自定义域名
+
+1. Go to your project settings in Vercel | 在 Vercel 中进入项目设置
+2. Click "Domains" | 点击 "Domains"
+3. Add your custom domain | 添加你的自定义域名
+4. Follow the DNS configuration instructions | 按照 DNS 配置说明操作
+
+### Environment Variables | 环境变量
+
+Make sure to add these environment variables in your Vercel project settings | 确保在 Vercel 项目设置中添加以下环境变量:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+``` 
