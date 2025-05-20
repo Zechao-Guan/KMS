@@ -5,16 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Pencil, Trash2, X, Check } from "lucide-react";
+import { Pencil, Trash2, X, Check, BookOpen, Bookmark, Tag, Clock } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Area, AreaChart } from 'recharts';
+import { format, subDays, parseISO } from 'date-fns';
 
 type Paper = {
-  id: number;
+  id: string;
   title: string;
-  link: string;
-  note: string;
-  status: "unread" | "read";
-  tags: string[];
+  link?: string;
+  note?: string;
+  status: "read" | "unread";
+  tags?: string[];
   created_at: string;
+  updated_at: string;
 };
 
 type NewPaper = {
@@ -48,11 +51,61 @@ export default function Papers() {
 
   // 统计数据
   const stats = useMemo(() => {
+    const total = papers.length;
+    const read = papers.filter(p => p.status === "read").length;
+    const unread = papers.filter(p => p.status === "unread").length;
+    const readPercentage = total > 0 ? Math.round((read / total) * 100) : 0;
+    const unreadPercentage = total > 0 ? Math.round((unread / total) * 100) : 0;
+    const uniqueTags = new Set(papers.flatMap(p => p.tags || []));
+
     return {
-      total: papers.length,
-      read: papers.filter(p => p.status === "read").length,
-      unread: papers.filter(p => p.status === "unread").length,
+      total,
+      read,
+      unread,
+      readPercentage,
+      unreadPercentage,
+      uniqueTagsCount: uniqueTags.size
     };
+  }, [papers]);
+
+  // 标签分布数据
+  const tagDistribution = useMemo(() => {
+    const tagCount: { [key: string]: number } = {};
+    papers.forEach(paper => {
+      paper.tags?.forEach(tag => {
+        tagCount[tag] = (tagCount[tag] || 0) + 1;
+      });
+    });
+    return Object.entries(tagCount).map(([name, count]) => ({ name, count }));
+  }, [papers]);
+
+  // 阅读时间线数据
+  const readingTimeline = useMemo(() => {
+    const last30Days = Array.from({ length: 30 }, (_, i) => {
+      const date = subDays(new Date(), i);
+      return format(date, 'yyyy-MM-dd');
+    }).reverse();
+
+    const timelineData = last30Days.map(date => {
+      const papersOnDay = papers.filter(paper => {
+        const paperDate = paper.status === 'read' ? paper.updated_at : paper.created_at;
+        return paperDate && format(parseISO(paperDate), 'yyyy-MM-dd') === date;
+      });
+
+      return {
+        date,
+        count: papersOnDay.length
+      };
+    });
+
+    return timelineData;
+  }, [papers]);
+
+  // 最近活动
+  const recentActivity = useMemo(() => {
+    return papers
+      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+      .slice(0, 5);
   }, [papers]);
 
   const fetchPapers = async () => {
@@ -73,19 +126,41 @@ export default function Papers() {
 
   const addPaper = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAdding(true);
+    if (!newPaper.title.trim()) return;
+
+    setLoading(true);
     setError(null);
-    const { error } = await supabase.from("papers").insert([
-      { ...newPaper, status: "unread" },
-    ]);
-    if (error) setError(error.message);
-    setNewPaper({ title: "", link: "", note: "", tags: [] });
-    setShowForm(false);
-    setAdding(false);
-    fetchPapers();
+
+    try {
+      const { data, error } = await supabase
+        .from("papers")
+        .insert([
+          {
+            title: newPaper.title.trim(),
+            link: newPaper.link ? newPaper.link.trim() : null,
+            note: newPaper.note ? newPaper.note.trim() : null,
+            status: "unread",
+            tags: newPaper.tags.length > 0 ? newPaper.tags : null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setPapers([...papers, data]);
+      setNewPaper({ title: "", link: "", note: "", tags: [] });
+    } catch (error) {
+      console.error("Error adding paper:", error);
+      setError("Failed to add paper");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleStatus = async (id: number, currentStatus: "unread" | "read") => {
+  const toggleStatus = async (id: string, currentStatus: "unread" | "read") => {
     setLoading(true);
     setError(null);
     const newStatus = currentStatus === "read" ? "unread" : "read";
@@ -162,7 +237,7 @@ export default function Papers() {
     setLoading(false);
   };
 
-  const deletePaper = async (id: number) => {
+  const deletePaper = async (id: string) => {
     if (!confirm("Are you sure you want to delete this paper?")) return;
     
     setLoading(true);
@@ -183,81 +258,279 @@ export default function Papers() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="max-w-5xl mx-auto"
+          className="max-w-7xl mx-auto space-y-8"
         >
-          <h1 className="text-4xl md:text-5xl font-bold text-center mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
-            Papers
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-            Track and manage your research papers with ease
-          </p>
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold text-center mb-4 bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
+              Papers
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+              Track and manage your research papers with ease
+            </p>
+          </div>
 
-          {/* 统计信息卡片 */}
+          {/* 总览卡片 */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+            >
+              <Card className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-[#333] dark:to-[#111] border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-white/50 dark:bg-white/10">
+                      <BookOpen className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {stats.total}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Total Papers
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <Card className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-[#333] dark:to-[#111] border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-green-100 dark:bg-green-900/30">
+                      <Check className="w-6 h-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {stats.read}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Read ({stats.readPercentage}%)
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              <Card className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-[#333] dark:to-[#111] border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900/30">
+                      <Bookmark className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {stats.unread}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Unread ({stats.unreadPercentage}%)
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              <Card className="bg-gradient-to-br from-gray-100 to-gray-200 dark:from-[#333] dark:to-[#111] border-0">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-blue-100 dark:bg-blue-900/30">
+                      <Tag className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <div className="text-3xl font-bold text-gray-900 dark:text-white">
+                        {stats.uniqueTagsCount}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Unique Tags
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* 标签分布图 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="w-full md:max-w-3xl mx-auto bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-2xl border border-white/30 shadow-md p-6 mb-8"
+            transition={{ duration: 0.6, delay: 0.5 }}
           >
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
-                  {stats.total}
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Tag Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={tagDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <XAxis 
+                        dataKey="name" 
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                      />
+                      <YAxis 
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar 
+                        dataKey="count" 
+                        fill="#3b82f6" 
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total Papers</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400 mb-1">
-                  {stats.read}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Read</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400 mb-1">
-                  {stats.unread}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Unread</div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
-          {/* 标签筛选区域 */}
+          {/* 阅读时间线 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            className="flex flex-wrap justify-center gap-2 mb-8"
+            transition={{ duration: 0.6, delay: 0.6 }}
           >
-            {allTags.length > 0 ? (
-              allTags.map((tag) => (
-                <motion.button
-                  key={tag}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                  className={`rounded-full bg-gradient-to-br from-gray-100 to-gray-300 dark:from-[#444] dark:to-[#222] 
-                    text-black dark:text-white px-4 py-1.5 text-sm shadow hover:shadow-md transition-all duration-200
-                    ${selectedTag === tag 
-                      ? 'ring-2 ring-blue-500 dark:ring-blue-400 shadow-lg scale-105' 
-                      : 'hover:scale-105'}`}
-                >
-                  <span className="flex items-center gap-1.5">
-                    {tag}
-                    {selectedTag === tag && (
-                      <span className="text-xs bg-blue-500 dark:bg-blue-400 text-white rounded-full w-4 h-4 flex items-center justify-center">
-                        ×
-                      </span>
-                    )}
-                  </span>
-                </motion.button>
-              ))
-            ) : (
-              <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                No tags available
-              </div>
-            )}
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Reading Timeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={readingTimeline}>
+                      <defs>
+                        <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-gray-700" />
+                      <XAxis 
+                        dataKey="date" 
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                      />
+                      <YAxis 
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                          border: 'none',
+                          borderRadius: '8px',
+                          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="count" 
+                        stroke="#3b82f6" 
+                        fillOpacity={1} 
+                        fill="url(#colorCount)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
+          {/* 最近活动 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.7 }}
+          >
+            <Card className="bg-white/60 dark:bg-white/10 backdrop-blur-md border border-white/30">
+              <CardHeader>
+                <CardTitle className="text-xl font-semibold">Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentActivity.map((paper) => (
+                    <motion.div
+                      key={paper.id}
+                      whileHover={{ scale: 1.02 }}
+                      className="bg-white/60 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 shadow-lg border border-white/30 dark:border-white/10"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-1">
+                            {paper.title}
+                          </h3>
+                          {paper.tags && paper.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {paper.tags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400">
+                            <Clock className="w-4 h-4" />
+                            <span>
+                              {format(parseISO(paper.updated_at), 'MMM d, yyyy')}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => toggleStatus(paper.id, paper.status)}
+                            variant={paper.status === "read" ? "default" : "outline"}
+                            className="rounded-full"
+                          >
+                            {paper.status === "read" ? "Read" : "Unread"}
+                          </Button>
+                          {paper.link && (
+                            <Button
+                              asChild
+                              variant="outline"
+                              className="rounded-full"
+                            >
+                              <a href={paper.link} target="_blank" rel="noopener noreferrer">
+                                View
+                              </a>
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* 原有的论文列表和添加表单 */}
           <div className="flex flex-col md:flex-row gap-8">
             {/* 左侧表单 */}
             <motion.div
