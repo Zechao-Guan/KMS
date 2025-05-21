@@ -12,6 +12,9 @@ A modern, elegant knowledge management system built with Next.js, Tailwind CSS, 
 - Store paper links and notes | 存储论文链接和笔记
 - Filter papers by tags | 按标签筛选论文
 - Beautiful and intuitive interface | 美观直观的界面
+- Track reading status | 追踪阅读状态
+- Search and filter functionality | 搜索和筛选功能
+- Statistics and analytics | 统计和分析功能
 
 ### Vocabulary Management | 词汇管理
 - Build and maintain your vocabulary list | 构建和维护词汇表
@@ -24,9 +27,10 @@ A modern, elegant knowledge management system built with Next.js, Tailwind CSS, 
 - **Frontend**: Next.js 14, React, Tailwind CSS
 - **UI Components**: shadcn/ui
 - **Animations**: Framer Motion
-- **Database**: Supabase
+- **Database**: Supabase (PostgreSQL)
 - **Styling**: Tailwind CSS with custom gradients and animations | 带有自定义渐变和动画的 Tailwind CSS
 - **Icons**: Lucide React
+- **Charts**: Recharts
 
 ## Getting Started | 开始使用
 
@@ -36,12 +40,75 @@ A modern, elegant knowledge management system built with Next.js, Tailwind CSS, 
 - npm or yarn
 - Supabase account | Supabase 账号
 
+### Supabase Setup | Supabase 设置
+
+1. Create a Supabase Account | 创建 Supabase 账号:
+   - Go to [https://supabase.com](https://supabase.com)
+   - Sign up for a free account | 注册一个免费账号
+   - Create a new project | 创建新项目
+
+2. Set up Database Tables | 设置数据库表:
+
+```sql
+-- Papers table | 论文表
+create table papers (
+  id uuid default uuid_generate_v4() primary key,
+  title text not null,
+  link text,
+  note text,
+  status text default 'unread',
+  tags text[] default '{}',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Words table | 单词表
+create table words (
+  id uuid default uuid_generate_v4() primary key,
+  word text not null,
+  definition text,
+  example text,
+  learned boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable Row Level Security (RLS) | 启用行级安全
+alter table papers enable row level security;
+alter table words enable row level security;
+
+-- Create policies | 创建策略
+create policy "Enable read access for all users" on papers for select using (true);
+create policy "Enable insert for authenticated users only" on papers for insert with check (auth.role() = 'authenticated');
+create policy "Enable update for authenticated users only" on papers for update using (auth.role() = 'authenticated');
+create policy "Enable delete for authenticated users only" on papers for delete using (auth.role() = 'authenticated');
+
+-- Create trigger for updating updated_at | 创建更新 updated_at 的触发器
+create or replace function update_updated_at_column()
+returns trigger as $$
+begin
+    new.updated_at = timezone('utc'::text, now());
+    return new;
+end;
+$$ language 'plpgsql';
+
+create trigger update_papers_updated_at
+    before update on papers
+    for each row
+    execute function update_updated_at_column();
+```
+
+3. Get API Keys | 获取 API 密钥:
+   - Go to Project Settings > API | 进入项目设置 > API
+   - Copy the `Project URL` and `anon` public key | 复制 `Project URL` 和 `anon` 公钥
+   - Add these to your `.env.local` file | 将这些添加到 `.env.local` 文件中
+
 ### Installation | 安装步骤
 
 1. Clone the repository | 克隆仓库:
 ```bash
-git clone https://github.com/yourusername/knowledge-hub.git
-cd knowledge-hub
+git clone https://github.com/Zechao-Guan/KMS.git
+cd KMS
 ```
 
 2. Install dependencies | 安装依赖:
@@ -63,17 +130,6 @@ npm run dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser | 在浏览器中打开 [http://localhost:3000](http://localhost:3000)
 
-## Project Structure | 项目结构
-
-```
-knowledge-hub/
-├── components/     # Reusable UI components | 可复用的 UI 组件
-├── pages/         # Next.js pages | Next.js 页面
-├── public/        # Static assets | 静态资源
-├── styles/        # Global styles | 全局样式
-└── types/         # TypeScript type definitions | TypeScript 类型定义
-```
-
 ## Features in Detail | 功能详解
 
 ### Paper Management | 论文管理
@@ -81,6 +137,9 @@ knowledge-hub/
 - Tag papers for easy categorization | 为论文添加标签以便分类
 - Store paper links and personal notes | 存储论文链接和个人笔记
 - Filter papers by tags | 按标签筛选论文
+- Track reading status (read/unread) | 追踪阅读状态（已读/未读）
+- Search papers by title | 按标题搜索论文
+- View paper statistics and analytics | 查看论文统计和分析
 - Responsive design for all devices | 适配所有设备的响应式设计
 
 ### Vocabulary Management | 词汇管理
@@ -89,6 +148,18 @@ knowledge-hub/
 - Track learning progress | 追踪学习进度
 - Review words with spaced repetition | 使用间隔重复复习单词
 - Search and filter functionality | 搜索和筛选功能
+
+## Project Structure | 项目结构
+
+```
+KMS/
+├── app/           # Next.js app directory | Next.js 应用目录
+├── components/    # Reusable UI components | 可复用的 UI 组件
+├── lib/          # Utility functions and configurations | 工具函数和配置
+├── public/       # Static assets | 静态资源
+├── styles/       # Global styles | 全局样式
+└── types/        # TypeScript type definitions | TypeScript 类型定义
+```
 
 ## Contributing | 贡献指南
 
@@ -109,6 +180,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Supabase](https://supabase.com/)
 - [shadcn/ui](https://ui.shadcn.com/)
 - [Framer Motion](https://www.framer.com/motion/)
+- [Recharts](https://recharts.org/)
+- [Lucide Icons](https://lucide.dev/)
 
 ## Deployment | 部署
 
