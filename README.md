@@ -117,6 +117,7 @@ npm install
 ```
 
 3. Set up environment variables | 配置环境变量:
+
 Create a `.env.local` file in the root directory with the following variables | 在根目录创建 `.env.local` 文件并添加以下变量:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -214,33 +215,6 @@ Make sure to add these environment variables in your Vercel project settings | �
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ``` 
-
-## Project Structure | 项目结构
-
-```
-knowledge-hub/
-├── components/     # Reusable UI components | 可复用的 UI 组件
-├── pages/         # Next.js pages | Next.js 页面
-├── public/        # Static assets | 静态资源
-├── styles/        # Global styles | 全局样式
-└── types/         # TypeScript type definitions | TypeScript 类型定义
-```
-
-## Features in Detail | 功能详解
-
-### Paper Management | 论文管理
-- Add new papers with title, authors, and publication details | 添加包含标题、作者和出版详情的新论文
-- Tag papers for easy categorization | 为论文添加标签以便分类
-- Store paper links and personal notes | 存储论文链接和个人笔记
-- Filter papers by tags | 按标签筛选论文
-- Responsive design for all devices | 适配所有设备的响应式设计
-
-### Vocabulary Management | 词汇管理
-- Add new words with definitions | 添加新单词及其释义
-- Include example sentences | 包含例句
-- Track learning progress | 追踪学习进度
-- Review words with spaced repetition | 使用间隔重复复习单词
-- Search and filter functionality | 搜索和筛选功能
 
 ## Contributing | 贡献指南
 
